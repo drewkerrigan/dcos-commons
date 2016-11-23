@@ -9,6 +9,11 @@ pods:
   meta-data:
     placement: "avoid-type: meta-data"
     count: 2
+    container:
+      rlimits:
+        RLMT_AS:
+          soft: 5
+          hard: 10
     resource-sets:
       meta-data-resources:
         cpus: 0.1

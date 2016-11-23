@@ -3,6 +3,7 @@ package com.mesosphere.sdk.offer;
 import com.google.protobuf.TextFormat;
 import com.mesosphere.sdk.config.TaskConfigRouter;
 import com.mesosphere.sdk.specification.*;
+import com.mesosphere.sdk.specification.util.RLimit;
 import com.mesosphere.sdk.state.StateStore;
 import com.mesosphere.sdk.state.StateStoreUtils;
 import org.apache.mesos.Protos;
@@ -24,6 +25,13 @@ public class DefaultOfferRequirementProvider implements OfferRequirementProvider
 
     private static final String JAVA_HOME = "JAVA_HOME";
     private static final String POD_INSTANCE_INDEX_KEY = "POD_INSTANCE_INDEX";
+    private static final Map<String, Protos.RLimitInfo.RLimit.Type> RLIMIT_TYPE_MAP = new HashMap<>();
+
+    static {
+        for (Protos.RLimitInfo.RLimit.Type t : Protos.RLimitInfo.RLimit.Type.values()) {
+            RLIMIT_TYPE_MAP.put(t.toString(), t);
+        }
+    }
 
     private final TaskConfigRouter taskConfigRouter;
     private final StateStore stateStore;
@@ -401,6 +409,39 @@ public class DefaultOfferRequirementProvider implements OfferRequirementProvider
         return volumes;
     }
 
+    private Protos.ContainerInfo getContainerInfo(ContainerSpec containerSpec) {
+        Protos.ContainerInfo.Builder containerInfo = Protos.ContainerInfo.newBuilder()
+                .setType(Protos.ContainerInfo.Type.MESOS);
+
+        if (containerSpec.getImageName().isPresent()) {
+            containerInfo.setDocker(containerInfo.getDockerBuilder().setImage(containerSpec.getImageName().get()));
+        }
+
+        if (containerSpec.getRLimitSpec().isPresent()) {
+            containerInfo.setRlimitInfo(getRLimitInfo(containerSpec.getRLimitSpec().get()));
+        }
+
+        return containerInfo.build();
+    }
+
+    private static Protos.RLimitInfo getRLimitInfo(RLimitSpec rLimitSpec) {
+        Protos.RLimitInfo.Builder rLimitInfoBuilder = Protos.RLimitInfo.newBuilder();
+
+        for (RLimit rLimit : rLimitSpec.getRLimits()) {
+            Optional<Long> soft = rLimit.getSoft();
+            Optional<Long> hard = rLimit.getHard();
+            Protos.RLimitInfo.RLimit.Builder rLimitsBuilder = Protos.RLimitInfo.RLimit.newBuilder()
+                    .setType(RLIMIT_TYPE_MAP.get(rLimit.getName()));
+
+            if (soft.isPresent() && hard.isPresent()) {
+                rLimitsBuilder.setSoft(soft.get()).setHard(hard.get());
+            }
+            rLimitInfoBuilder.addRlimits(rLimitsBuilder);
+        }
+
+        return rLimitInfoBuilder.build();
+    }
+
     private Protos.ExecutorInfo.Builder getNewExecutorInfo(PodSpec podSpec) throws IllegalStateException {
         Protos.CommandInfo.URI executorURI;
         Protos.CommandInfo.URI libmesosURI;
@@ -410,12 +451,7 @@ public class DefaultOfferRequirementProvider implements OfferRequirementProvider
                 .setExecutorId(Protos.ExecutorID.newBuilder().setValue("").build()); // Set later by ExecutorRequirement
 
         if (podSpec.getContainer().isPresent()) {
-            executorInfoBuilder.setContainer(
-                    Protos.ContainerInfo.newBuilder()
-                            .setType(Protos.ContainerInfo.Type.MESOS)
-                            .setDocker(Protos.ContainerInfo.DockerInfo.newBuilder()
-                                .setImage(podSpec.getContainer().get().getImageName()))
-            );
+            executorInfoBuilder.setContainer(getContainerInfo(podSpec.getContainer().get()));
         }
 
         String executorStr = System.getenv(EXECUTOR_URI);

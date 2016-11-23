@@ -5,6 +5,11 @@ api-port: {{PORT0}}
 pods:
   hello:
     count: {{HELLO_COUNT}}
+    container:
+      rlimits:
+        RLIMIT_MEMLOCK:
+          soft: 32
+          hard: 32
     tasks:
       server:
         goal: RUNNING

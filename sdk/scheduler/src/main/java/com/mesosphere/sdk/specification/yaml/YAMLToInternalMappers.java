@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.mesos.Protos;
 import com.mesosphere.sdk.scheduler.SchedulerUtils;
 import com.mesosphere.sdk.specification.*;
+import com.mesosphere.sdk.specification.util.RLimit;
 
 import java.io.File;
 import java.io.IOException;
@@ -118,7 +119,7 @@ public class YAMLToInternalMappers {
         if (container != null) {
             System.out.println("HELLO");
             System.out.println(container.toString());
-            builder.container(new DefaultContainerSpec(container.getImageName()));
+            builder.container(new DefaultContainerSpec(container.getImageName(), from(container.getRLimits())));
         }
 
         final DefaultPodSpec podSpec = builder
@@ -131,6 +132,16 @@ public class YAMLToInternalMappers {
                 .build();
 
         return podSpec;
+    }
+
+    private static RLimitSpec from(LinkedHashMap<String, RawRLimit> rawRLimits) throws Exception {
+        List<RLimit> rlimits = new ArrayList<>();
+        for (Map.Entry<String, RawRLimit> entry : rawRLimits.entrySet()) {
+            RawRLimit rawRLimit = entry.getValue();
+            rlimits.add(new RLimit(entry.getKey(), rawRLimit.getSoft(), rawRLimit.getHard()));
+        }
+
+        return new DefaultRLimitSpec(rlimits);
     }
 
     public static ResourceSpecification from(RawResource rawResource, String role, String principal) {

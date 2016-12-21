@@ -25,13 +25,6 @@ public class DefaultOfferRequirementProvider implements OfferRequirementProvider
 
     private static final String JAVA_HOME = "JAVA_HOME";
     private static final String POD_INSTANCE_INDEX_KEY = "POD_INSTANCE_INDEX";
-    private static final Map<String, Protos.RLimitInfo.RLimit.Type> RLIMIT_TYPE_MAP = new HashMap<>();
-
-    static {
-        for (Protos.RLimitInfo.RLimit.Type t : Protos.RLimitInfo.RLimit.Type.values()) {
-            RLIMIT_TYPE_MAP.put(t.toString(), t);
-        }
-    }
 
     private final TaskConfigRouter taskConfigRouter;
     private final StateStore stateStore;
@@ -414,7 +407,7 @@ public class DefaultOfferRequirementProvider implements OfferRequirementProvider
                 .setType(Protos.ContainerInfo.Type.MESOS);
 
         if (containerSpec.getImageName().isPresent()) {
-            containerInfo.setDocker(containerInfo.getDockerBuilder().setImage(containerSpec.getImageName().get()));
+            containerInfo.getDockerBuilder().setImage(containerSpec.getImageName().get());
         }
 
         if (containerSpec.getRLimitSpec().isPresent()) {
@@ -431,7 +424,7 @@ public class DefaultOfferRequirementProvider implements OfferRequirementProvider
             Optional<Long> soft = rLimit.getSoft();
             Optional<Long> hard = rLimit.getHard();
             Protos.RLimitInfo.RLimit.Builder rLimitsBuilder = Protos.RLimitInfo.RLimit.newBuilder()
-                    .setType(RLIMIT_TYPE_MAP.get(rLimit.getName()));
+                    .setType(rLimit.getEnum());
 
             if (soft.isPresent() && hard.isPresent()) {
                 rLimitsBuilder.setSoft(soft.get()).setHard(hard.get());
